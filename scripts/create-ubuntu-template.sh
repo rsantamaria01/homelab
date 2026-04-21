@@ -47,13 +47,13 @@ qemu-img resize "$QCOW2_IMG" "$DISK_SIZE"
 
 echo "[*] Installing Docker into image..."
 virt-customize -a "$QCOW2_IMG" \
-    --install "ca-certificates,curl" \
+    --run-command 'apt-get install -y ca-certificates curl' \
     --run-command 'install -m 0755 -d /etc/apt/keyrings' \
     --run-command 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc' \
     --run-command 'chmod a+r /etc/apt/keyrings/docker.asc' \
     --run-command 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list' \
-    --update \
-    --install "docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin"
+    --run-command 'apt-get update' \
+    --run-command 'DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'
 
 # Create VM
 echo "[*] Creating VM ${VMID}..."
