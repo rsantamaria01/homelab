@@ -41,6 +41,26 @@ wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/f
 
 ---
 
+## create-ubuntu-template.sh
+
+Creates a Ubuntu 24.04 cloud-init VM template on a Proxmox node.
+
+- Downloads the Ubuntu Noble cloud image and converts it to qcow2
+- Resizes the disk to 10G
+- Creates a VM (VMID 1000) with q35/OVMF, virtio-scsi, and cloud-init drive
+- Converts the VM to a Proxmox template
+
+> Run directly on the Proxmox node as root. Skips safely if VMID 1000 already exists.
+
+```bash
+# curl
+curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | sudo bash
+# wget (fresh containers without curl)
+wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | sudo bash
+```
+
+---
+
 ## Notes
 
 - All scripts require root or `sudo`
