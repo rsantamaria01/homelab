@@ -19,6 +19,11 @@ DISK_SIZE="10G"
 
 echo "[*] Node: $(hostname)"
 
+if ! command -v virt-customize &>/dev/null; then
+    echo "[*] Installing libguestfs-tools..."
+    apt-get install -y libguestfs-tools
+fi
+
 # Guard: skip if VM already exists
 if qm status "$VMID" &>/dev/null; then
     echo "[!] VM $VMID already exists. Aborting."
@@ -40,6 +45,16 @@ fi
 echo "[*] Resizing disk to ${DISK_SIZE}..."
 qemu-img resize "$QCOW2_IMG" "$DISK_SIZE"
 
+echo "[*] Installing Docker into image..."
+virt-customize -a "$QCOW2_IMG" \
+    --install "ca-certificates,curl" \
+    --run-command 'install -m 0755 -d /etc/apt/keyrings' \
+    --run-command 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc' \
+    --run-command 'chmod a+r /etc/apt/keyrings/docker.asc' \
+    --run-command 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list' \
+    --update \
+    --install "docker-ce,docker-ce-cli,containerd.io,docker-buildx-plugin,docker-compose-plugin"
+
 # Create VM
 echo "[*] Creating VM ${VMID}..."
 qm create "$VMID" \
@@ -53,15 +68,15 @@ qm create "$VMID" \
     --net0 "virtio,bridge=vmbr0,firewall=1" \
     --agent enabled=1 \
     --serial0 socket \
-    --vga serial0 \
-    --machine q35
+    --vga serial0
 
 # Import + attach disk
 echo "[*] Importing disk..."
 qm importdisk "$VMID" "$QCOW2_IMG" "$VM_STORAGE"
 
 echo "[*] Attaching disk..."
-qm set "$VMID" --scsihw virtio-scsi-pci --scsi0 "${VM_STORAGE}:vm-${VMID}-disk-1,discard=on"
+DISK_REF=$(qm config "$VMID" | awk -F': ' '/^unused/{print $2; exit}')
+qm set "$VMID" --scsihw virtio-scsi-pci --scsi0 "${DISK_REF},discard=on"
 
 # Cloud-init drive + boot
 echo "[*] Configuring cloud-init + boot..."
