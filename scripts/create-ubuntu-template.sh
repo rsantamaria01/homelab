@@ -43,7 +43,11 @@ if [ ! -f "$QCOW2_IMG" ]; then
 fi
 
 echo "[*] Resizing disk to ${DISK_SIZE}..."
-qemu-img resize "$QCOW2_IMG" "$DISK_SIZE"
+EXPANDED_IMG="ubuntu-cloudinit-expanded.qcow2"
+qemu-img create -f qcow2 "$EXPANDED_IMG" "$DISK_SIZE"
+# virt-resize expands both the partition and filesystem, unlike qemu-img resize
+virt-resize --expand /dev/sda1 "$QCOW2_IMG" "$EXPANDED_IMG"
+mv "$EXPANDED_IMG" "$QCOW2_IMG"
 
 echo "[*] Installing Docker into image..."
 virt-customize -a "$QCOW2_IMG" \
