@@ -4,7 +4,11 @@ set -euo pipefail
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 VMID=1000
 VM_NAME="ubuntu-2404-cloudinit"
-VM_STORAGE="pve-nvme"
+if pvesm status | awk '{print $1}' | grep -qx "pve-nvme"; then
+    VM_STORAGE="pve-nvme"
+else
+    VM_STORAGE="local-lvm"
+fi
 ISO_DIR="/var/lib/vz/template/iso"
 CLOUD_IMG="noble-server-cloudimg-amd64.img"
 QCOW2_IMG="ubuntu-cloudinit.qcow2"
