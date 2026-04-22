@@ -71,8 +71,7 @@ qm create "$VMID" \
     --efidisk0 "${VM_STORAGE}:0,efitype=4m,pre-enrolled-keys=1" \
     --net0 "virtio,bridge=vmbr0,firewall=1" \
     --agent enabled=1 \
-    --serial0 socket \
-    --vga serial0
+    --vga qxl
 
 # Import + attach disk
 echo "[*] Importing disk..."
