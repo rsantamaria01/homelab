@@ -4,12 +4,7 @@ set -euo pipefail
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 VMID=1000
 VM_NAME="ubuntu-2404-cloudinit"
-if pvesm status | awk 'NR>1 && $3=="active" {print $1}' | grep -qx "pve-nvme"; then
-    VM_STORAGE="pve-nvme"
-else
-    VM_STORAGE="local-lvm"
-fi
-echo $VM_STORAGE
+VM_STORAGE="local-lvm"
 ISO_DIR="/var/lib/vz/template/iso"
 CLOUD_IMG="noble-server-cloudimg-amd64.img"
 QCOW2_IMG="ubuntu-cloudinit.qcow2"
@@ -33,14 +28,19 @@ fi
 # Download + prepare image
 cd "$ISO_DIR"
 
-if [ ! -f "$QCOW2_IMG" ]; then
-    if [ ! -f "$CLOUD_IMG" ]; then
-        echo "[*] Downloading cloud image..."
-        wget -q --show-progress "$CLOUD_IMG_URL"
-    fi
-    echo "[*] Renaming to qcow2..."
-    mv "$CLOUD_IMG" "$QCOW2_IMG"
+if [ -f "$QCOW2_IMG" ]; then
+    echo "[*] Removing existing $QCOW2_IMG..."
+    rm -f "$QCOW2_IMG"
 fi
+
+if [ ! -f "$CLOUD_IMG" ]; then
+    echo "[*] Downloading cloud image..."
+    wget -q --show-progress "$CLOUD_IMG_URL"
+fi
+
+echo "[*] Renaming to qcow2..."
+mv "$CLOUD_IMG" "$QCOW2_IMG"
+
 
 echo "[*] Resizing disk to ${DISK_SIZE}..."
 EXPANDED_IMG="ubuntu-cloudinit-expanded.qcow2"
@@ -71,7 +71,7 @@ qm create "$VMID" \
     --efidisk0 "${VM_STORAGE}:0,efitype=4m,pre-enrolled-keys=1" \
     --net0 "virtio,bridge=vmbr0,firewall=1" \
     --agent enabled=1 \
-    --vga qxl
+    --vga virtio
 
 # Import + attach disk
 echo "[*] Importing disk..."
