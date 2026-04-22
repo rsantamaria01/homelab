@@ -38,8 +38,8 @@ if [ ! -f "$CLOUD_IMG" ]; then
     wget -q --show-progress "$CLOUD_IMG_URL"
 fi
 
-echo "[*] Renaming to qcow2..."
-mv "$CLOUD_IMG" "$QCOW2_IMG"
+echo "[*] Copying to qcow2 (preserving base image for re-runs)..."
+cp "$CLOUD_IMG" "$QCOW2_IMG"
 
 
 echo "[*] Resizing disk to ${DISK_SIZE}..."
@@ -51,6 +51,7 @@ mv "$EXPANDED_IMG" "$QCOW2_IMG"
 
 echo "[*] Installing packages into image..."
 virt-customize -a "$QCOW2_IMG" \
+    --run-command 'apt-get update' \
     --run-command 'apt-get install -y qemu-guest-agent' \
     --run-command 'systemctl enable qemu-guest-agent' \
     --run-command 'apt-get install -y ca-certificates curl' \
