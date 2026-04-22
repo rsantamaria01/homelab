@@ -49,8 +49,10 @@ qemu-img create -f qcow2 "$EXPANDED_IMG" "$DISK_SIZE"
 virt-resize --expand /dev/sda1 "$QCOW2_IMG" "$EXPANDED_IMG"
 mv "$EXPANDED_IMG" "$QCOW2_IMG"
 
-echo "[*] Installing Docker into image..."
+echo "[*] Installing packages into image..."
 virt-customize -a "$QCOW2_IMG" \
+    --run-command 'apt-get install -y qemu-guest-agent' \
+    --run-command 'systemctl enable qemu-guest-agent' \
     --run-command 'apt-get install -y ca-certificates curl' \
     --run-command 'install -m 0755 -d /etc/apt/keyrings' \
     --run-command 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc' \
