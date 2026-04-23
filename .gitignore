@@ -1,0 +1,13 @@
+
+# Ignore environment variable files
+.env
+.env.*
+!.env.template
+
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore log files
+*.log

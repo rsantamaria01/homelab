@@ -1,0 +1,306 @@
+services:
+  decypharr:
+    container_name: decypharr
+    image: cy01/blackhole:latest
+    restart: unless-stopped
+    ports:
+      - "8282:8282"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/decypharr:/app
+      - /mnt/media-server/remote:/mnt/remote:shared
+      - /mnt/media-server/symlinks:/mnt/symlinks:shared
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    networks:
+      - mediastack
+
+  prowlarr:
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    restart: unless-stopped
+    ports:
+      - "9696:9696"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/prowlarr:/config
+    depends_on:
+      - sonarr
+      - sonarr-anime
+      - sonarr-kids
+      - radarr
+      - radarr-4k
+      - radarr-kids
+      - lidarr
+      - flaresolverr
+    networks:
+      - mediastack
+
+  sonarr:
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    restart: unless-stopped
+    ports:
+      - "8989:8989"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/sonarr:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/tv:/data/media/tv
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  sonarr-anime:
+    container_name: sonarr-anime
+    image: lscr.io/linuxserver/sonarr:latest
+    restart: unless-stopped
+    ports:
+      - "8990:8989"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/sonarr-anime:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/tv-anime:/data/media/tv-anime
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  sonarr-kids:
+    container_name: sonarr-kids
+    image: lscr.io/linuxserver/sonarr:latest
+    restart: unless-stopped
+    ports:
+      - "8991:8989"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/sonarr-kids:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/tv-kids:/data/media/tv-kids
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/radarr:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/movies:/data/media/movies
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  radarr-4k:
+    container_name: radarr-4k
+    image: lscr.io/linuxserver/radarr:latest
+    restart: unless-stopped
+    ports:
+      - "7879:7878"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/radarr-4k:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/movies-4k:/data/media/movies-4k
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  radarr-kids:
+    container_name: radarr-kids
+    image: lscr.io/linuxserver/radarr:latest
+    restart: unless-stopped
+    ports:
+      - "7880:7878"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/radarr-kids:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/movies-kids:/data/media/movies-kids
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  lidarr:
+    container_name: lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    restart: unless-stopped
+    ports:
+      - "8686:8686"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/lidarr:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/music:/data/media/music
+    depends_on:
+      - decypharr
+    networks:
+      - mediastack
+
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    restart: unless-stopped
+    ports:
+      - "6767:6767"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/bazarr:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media/subtitles:/data/media/subtitles
+      - /srv/media-server/media/movies:/data/media/movies
+      - /srv/media-server/media/movies-kids:/data/media/movies-kids
+      - /srv/media-server/media/movies-4k:/data/media/movies-4k
+      - /srv/media-server/media/tv:/data/media/tv
+      - /srv/media-server/media/tv-anime:/data/media/tv-anime
+      - /srv/media-server/media/tv-kids:/data/media/tv-kids
+
+    depends_on:
+      - sonarr
+      - sonarr-anime
+      - sonarr-kids
+      - radarr
+      - radarr-4k
+      - radarr-kids
+    networks:
+      - mediastack
+
+  profilarr:
+    container_name: profilarr
+    image: santiagosayshey/profilarr:latest
+    restart: unless-stopped
+    ports:
+      - "6868:6868"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/profilarr:/config
+    depends_on:
+      - sonarr
+      - sonarr-anime
+      - sonarr-kids
+      - radarr
+      - radarr-4k
+      - radarr-kids
+    networks:
+      - mediastack
+
+  jellyfin:
+    container_name: jellyfin
+    image: lscr.io/linuxserver/jellyfin:latest
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - 8096:8096
+      - 8920:8920
+      - 7359:7359/udp
+      - 1900:1900/udp
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/jellyfin:/config
+      - /mnt/media-server/remote:/mnt/remote:slave
+      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /srv/media-server/media:/data/media
+    depends_on:
+      - prowlarr
+    networks:
+      - mediastack
+
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:latest
+    restart: unless-stopped
+    init: true
+    ports:
+      - "5055:5055"
+    environment:
+      - LOG_LEVEL=info
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    depends_on:
+      - jellyfin
+    volumes:
+      - /opt/media-server/config/seerr:/app/config
+    networks:
+      - mediastack
+
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/flaresolverr:/app/config
+    networks:
+      - mediastack
+
+networks:
+  mediastack:
+    driver: bridge
