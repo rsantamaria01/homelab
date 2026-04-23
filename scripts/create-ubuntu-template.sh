@@ -73,7 +73,7 @@ qm create "$VMID" \
     --cpu x86-64-v2-AES \
     --bios ovmf \
     --machine q35 \
-    --efidisk0 "${VM_STORAGE}:0,efitype=4m,pre-enrolled-keys=1" \
+    --efidisk0 "${VM_STORAGE}:0,efitype=4m,pre-enrolled-keys=0" \
     --net0 "virtio,bridge=vmbr0,firewall=1" \
     --agent enabled=1 \
     --serial0 socket \
