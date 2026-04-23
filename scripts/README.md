@@ -54,9 +54,9 @@ Creates a Ubuntu 24.04 cloud-init VM template on a Proxmox node.
 
 ```bash
 # curl
-curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | bash
 # wget (fresh containers without curl)
-wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | sudo bash
+wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | bash
 ```
 
 ---

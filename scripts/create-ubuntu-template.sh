@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-VMID=1000
+NODE_ID=$(pvecm nodes | awk '/local/{print $1}')
+VMID="${NODE_ID}000"
 VM_NAME="ubuntu-2404-cloudinit"
 VM_STORAGE="local-lvm"
 ISO_DIR="/var/lib/vz/template/iso"
@@ -12,7 +13,8 @@ CLOUD_IMG_URL="https://cloud-images.ubuntu.com/noble/current/${CLOUD_IMG}"
 DISK_SIZE="10G"
 # ─────────────────────────────────────────────────────────────────────────────
 
-echo "[*] Node: $(hostname)"
+
+echo "[*] Node $NODE_ID: $(hostname)"
 
 if ! command -v virt-customize &>/dev/null; then
     echo "[*] Installing libguestfs-tools..."
