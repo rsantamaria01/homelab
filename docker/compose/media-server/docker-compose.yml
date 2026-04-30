@@ -285,6 +285,16 @@ services:
     networks:
       - mediastack
 
+  fladder:
+    container_name: fladder
+    image: ghcr.io/donutware/fladder:latest
+    restart: unless-stopped
+    ports:
+      - 8080:80
+    environment:
+      - BASE_URL=http://jellyfin:8096 #OPTIONAL: Presets Fladder base URL to Jellyfin
+      - SEERR_BASE_URL=http://seerr:5055 #OPTIONAL: Presets Seerr base URL
+
   flaresolverr:
     container_name: flaresolverr
     image: ghcr.io/flaresolverr/flaresolverr:latest
