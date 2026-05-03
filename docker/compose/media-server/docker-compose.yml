@@ -462,8 +462,8 @@ services:
     ports:
       - 8080:80
     environment:
-      - BASE_URL=https://jellyfin.rsantamaria.xyz
-      - SEERR_BASE_URL=https://seerr.rsantamaria.xyz
+      - BASE_URL=http://jellyfin:8096
+      - SEERR_BASE_URL=http://seerr:5055
     depends_on:
       jellyfin:
         condition: service_healthy
