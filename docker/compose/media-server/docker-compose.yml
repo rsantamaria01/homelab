@@ -1,7 +1,29 @@
 services:
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8191"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mediastack
+
   decypharr:
     container_name: decypharr
-    image: cy01/blackhole:latest
+    image: ghcr.io/sirrobot01/decypharr:latest
     restart: unless-stopped
     ports:
       - "8282:8282"
@@ -11,14 +33,25 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/decypharr:/app
-      - /mnt/media-server/remote:/mnt/remote:shared
-      - /mnt/media-server/symlinks:/mnt/symlinks:shared
+      - /mnt/media-server/remote:/mnt/remote:rshared
+      - /mnt/media-server/symlinks:/mnt/symlinks:rshared
     devices:
       - /dev/fuse:/dev/fuse:rwm
     cap_add:
       - SYS_ADMIN
     security_opt:
       - apparmor:unconfined
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8282"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -35,14 +68,19 @@ services:
     volumes:
       - /opt/media-server/config/prowlarr:/config
     depends_on:
-      - sonarr
-      - sonarr-anime
-      - sonarr-kids
-      - radarr
-      - radarr-4k
-      - radarr-kids
-      - lidarr
-      - flaresolverr
+      flaresolverr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9696/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -58,11 +96,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/sonarr:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/tv:/data/media/tv
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -78,11 +128,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/sonarr-anime:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/tv-anime:/data/media/tv-anime
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -98,11 +160,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/sonarr-kids:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/tv-kids:/data/media/tv-kids
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -118,11 +192,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/radarr:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/movies:/data/media/movies
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -138,11 +224,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/radarr-4k:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/movies-4k:/data/media/movies-4k
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -158,11 +256,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/radarr-kids:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/movies-kids:/data/media/movies-kids
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -178,11 +288,23 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/lidarr:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/music:/data/media/music
     depends_on:
-      - decypharr
+      decypharr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8686/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -198,8 +320,8 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/bazarr:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/subtitles:/data/media/subtitles
       - /srv/media-server/media/movies:/data/media/movies
       - /srv/media-server/media/movies-kids:/data/media/movies-kids
@@ -207,14 +329,30 @@ services:
       - /srv/media-server/media/tv:/data/media/tv
       - /srv/media-server/media/tv-anime:/data/media/tv-anime
       - /srv/media-server/media/tv-kids:/data/media/tv-kids
-
     depends_on:
-      - sonarr
-      - sonarr-anime
-      - sonarr-kids
-      - radarr
-      - radarr-4k
-      - radarr-kids
+      sonarr:
+        condition: service_healthy
+      sonarr-anime:
+        condition: service_healthy
+      sonarr-kids:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      radarr-4k:
+        condition: service_healthy
+      radarr-kids:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6767"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -231,12 +369,23 @@ services:
     volumes:
       - /opt/media-server/config/profilarr:/config
     depends_on:
-      - sonarr
-      - sonarr-anime
-      - sonarr-kids
-      - radarr
-      - radarr-4k
-      - radarr-kids
+      sonarr:
+        condition: service_healthy
+      sonarr-anime:
+        condition: service_healthy
+      sonarr-kids:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      radarr-4k:
+        condition: service_healthy
+      radarr-kids:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -258,11 +407,20 @@ services:
       - UMASK=002
     volumes:
       - /opt/media-server/config/jellyfin:/config
-      - /mnt/media-server/remote:/mnt/remote:slave
-      - /mnt/media-server/symlinks:/mnt/symlinks:slave
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media:/data/media
-    depends_on:
-      - prowlarr
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -279,9 +437,21 @@ services:
       - PGID=1000
       - UMASK=002
     depends_on:
-      - jellyfin
+      jellyfin:
+        condition: service_healthy
     volumes:
       - /opt/media-server/config/seerr:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5055"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
@@ -292,24 +462,18 @@ services:
     ports:
       - 8080:80
     environment:
-      - BASE_URL=https://jellyfin.rsantamaria.xyz #OPTIONAL: Presets Fladder base URL to Jellyfin
-      - SEERR_BASE_URL=https://seerr.rsantamaria.xyz #OPTIONAL: Presets Seerr base URL
-    networks:
-      - mediastack
-
-  flaresolverr:
-    container_name: flaresolverr
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    restart: unless-stopped
-    ports:
-      - "8191:8191"
-    environment:
-      - LOG_LEVEL=info
-      - PUID=1000
-      - PGID=1000
-      - UMASK=002
-    volumes:
-      - /opt/media-server/config/flaresolverr:/app/config
+      - BASE_URL=https://jellyfin.rsantamaria.xyz
+      - SEERR_BASE_URL=https://seerr.rsantamaria.xyz
+    depends_on:
+      jellyfin:
+        condition: service_healthy
+      seerr:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mediastack
 
