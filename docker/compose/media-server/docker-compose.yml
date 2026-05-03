@@ -42,11 +42,11 @@ services:
     security_opt:
       - apparmor:unconfined
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8282"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8282 || wget -qO- http://localhost:8282 > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     logging:
       driver: json-file
       options:
