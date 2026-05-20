@@ -102,6 +102,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
       interval: 30s
@@ -134,6 +135,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
       interval: 30s
@@ -166,6 +168,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8989/ping"]
       interval: 30s
@@ -198,6 +201,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
       interval: 30s
@@ -230,6 +234,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
       interval: 30s
@@ -262,6 +267,7 @@ services:
     depends_on:
       decypharr:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:7878/ping"]
       interval: 30s
