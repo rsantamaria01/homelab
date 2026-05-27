@@ -3,8 +3,8 @@
 # Idempotent. Auto-detects e1000e interfaces. Reboots only if changes made.
 #
 # Run as root on each Proxmox node:
-#   curl -fsSL <url>/fix-e1000e.sh | sudo bash
-#   or: sudo bash fix-e1000e.sh
+#   curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/fix-e1000e-nic.sh | sudo bash
+#   or: sudo bash fix-e1000e-nic.sh
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ diff_q() { ! cmp -s "$1" "$2"; }
 
 CHANGED=0
 
-# --- 1. detect e1000e interfaces --------------------------------------------fix-e1000e
+# --- 1. detect e1000e interfaces --------------------------------------------
 mapfile -t IFACES < <(
   for d in /sys/class/net/*/device/driver; do
     [[ -L $d ]] || continue
@@ -67,6 +67,7 @@ for d in /sys/class/net/*/device/driver; do
   [[ $drv == e1000e ]] || continue
   iface=$(basename "$(dirname "$(dirname "$d")")")
   echo "e1000e-disable-offloads: tuning $iface"
+  /sbin/ethtool -C "$iface" rx-usecs 50 2>&1 || true
   /sbin/ethtool -K "$iface" \
     tso off gso off gro off lro off \
     tx off rx off sg off 2>&1 || true
