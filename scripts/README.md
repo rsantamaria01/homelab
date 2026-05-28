@@ -1,8 +1,6 @@
 # homelab/scripts
 
-One-liner scripts for fresh Ubuntu VM/CT setup.
-
----
+## One-liner scripts for fresh Ubuntu VM/CT setup
 
 ## install-docker.sh
 
@@ -57,6 +55,32 @@ Creates a Ubuntu 24.04 cloud-init VM template on a Proxmox node.
 curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | bash
 # wget (fresh containers without curl)
 wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/create-ubuntu-template.sh | bash
+```
+
+---
+
+## harden-security-ssh.sh
+
+Authorizes a single pubkey for root and disables password auth.
+
+- Backs up existing `authorized_keys` to `*.bak.<timestamp>`
+- Replaces user keys with `$SSH_PUBLIC_KEY` (cluster keys can be preserved via `KEEP_KEYS_MATCHING` regex)
+- Writes `/etc/ssh/sshd_config.d/10-disable-root-password.conf`:
+  - `PermitRootLogin prohibit-password`
+  - `PasswordAuthentication no`
+  - `KbdInteractiveAuthentication no`
+- Validates with `sshd -t` before reloading
+- Auto-detects Proxmox: uses `/etc/pve/priv/authorized_keys` (syncs cluster-wide), otherwise `/root/.ssh/authorized_keys`
+
+> Verify in a NEW terminal before closing the current session. Web UI (8006) on Proxmox remains as the lockout escape hatch.
+
+```bash
+# curl
+curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/harden-security-ssh.sh | sudo SSH_PUBLIC_KEY="ssh-ed25519 AAAA... user@host" bash
+# wget (fresh containers without curl)
+wget -qO- https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/harden-security-ssh.sh | sudo SSH_PUBLIC_KEY="ssh-ed25519 AAAA... user@host" bash
+# Proxmox cluster: preserve inter-node trust keys
+curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/harden-security-ssh.sh | sudo KEEP_KEYS_MATCHING='root@rs-srv-[0-9]+$' SSH_PUBLIC_KEY="sk-ecdsa-sha2-nistp256@openssh.com AAAA... rs@rs-lap-01" bash
 ```
 
 ---
