@@ -42,7 +42,11 @@ services:
     security_opt:
       - apparmor:unconfined
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8282 || wget -qO- http://localhost:8282 > /dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:8282 || wget -qO- http://localhost:8282 > /dev/null",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -330,11 +334,123 @@ services:
       - /mnt/media-server/symlinks:/mnt/symlinks:rslave
       - /srv/media-server/media/subtitles:/data/media/subtitles
       - /srv/media-server/media/movies:/data/media/movies
-      - /srv/media-server/media/movies-kids:/data/media/movies-kids
-      - /srv/media-server/media/movies-4k:/data/media/movies-4k
       - /srv/media-server/media/tv:/data/media/tv
-      - /srv/media-server/media/tv-anime:/data/media/tv-anime
+    depends_on:
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6767"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mediastack
+
+  bazarr-kids:
+    container_name: bazarr-kids
+    image: lscr.io/linuxserver/bazarr:latest
+    restart: unless-stopped
+    ports:
+      - "6768:6767"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/bazarr-kids:/config
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
+      - /srv/media-server/media/subtitles:/data/media/subtitles
+      - /srv/media-server/media/movies-kids:/data/media/movies-kids
       - /srv/media-server/media/tv-kids:/data/media/tv-kids
+    depends_on:
+      sonarr-kids:
+        condition: service_healthy
+      radarr-kids:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6767"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mediastack
+
+  bazarr-extra:
+    container_name: bazarr-extra
+    image: lscr.io/linuxserver/bazarr:latest
+    restart: unless-stopped
+    ports:
+      - "6769:6767"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+    volumes:
+      - /opt/media-server/config/bazarr-extra:/config
+      - /mnt/media-server/remote:/mnt/remote:rslave
+      - /mnt/media-server/symlinks:/mnt/symlinks:rslave
+      - /srv/media-server/media/subtitles:/data/media/subtitles
+      - /srv/media-server/media/movies-4k:/data/media/movies-4k
+      - /srv/media-server/media/tv-anime:/data/media/tv-anime
+    depends_on:
+      sonarr-anime:
+        condition: service_healthy
+      radarr-4k:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6767"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mediastack
+
+  fetcharr:
+    image: egg82/fetcharr:latest
+    container_name: fetcharr
+    restart: unless-stopped
+    env_file:
+      - ./fetcharr.env
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - SEARCH_INTERVAL=1hour
+      - SEARCH_AMOUNT=100
+      - MISSING_STATUS=any
+      - MONITOR_ONLY=true
+      - RADARR_0_URL=http://radarr:7878
+      - RADARR_1_URL=http://radarr-4k:7878
+      - RADARR_2_URL=http://radarr-kids:7878
+      - SONARR_0_URL=http://sonarr:8989
+      - SONARR_1_URL=http://sonarr-anime:8989
+      - SONARR_2_URL=http://sonarr-kids:8989
+    volumes:
+      - /opt/media-server/config/fetcharr/config:/app/config
+      - /opt/media-server/config/fetcharr/cache:/app/cache
+      - /opt/media-server/config/fetcharr/logs:/app/logs
+      - /opt/media-server/config/fetcharr/plugins:/app/plugins
     depends_on:
       sonarr:
         condition: service_healthy
@@ -349,7 +465,7 @@ services:
       radarr-kids:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:6767"]
+      test: ["CMD-SHELL", "pgrep -f fetcharr || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -448,7 +564,11 @@ services:
     volumes:
       - /opt/media-server/config/seerr:/app/config
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5055', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://localhost:5055'', r => process.exit(r.statusCode < 500 ? 0 : 1)).on(''error'', () => process.exit(1))"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

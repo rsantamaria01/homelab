@@ -4,6 +4,10 @@
 .env.*
 !.env.template
 
+# Ignore non-dot env files holding real secrets, keep templates
+*.env
+!*.env.template
+
 
 # Ignore OS-specific files
 .DS_Store
