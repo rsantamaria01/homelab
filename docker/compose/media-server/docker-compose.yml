@@ -477,8 +477,8 @@ services:
       - PUID=1000
       - PGID=1000
       - UMASK=002
-      - SEARCH_INTERVAL=1hour
-      - SEARCH_AMOUNT=100
+      - SEARCH_INTERVAL=6hour
+      - SEARCH_AMOUNT=20
       - MISSING_STATUS=missing
       - MONITOR_ONLY=true
       - RADARR_0_URL=http://radarr:7878
