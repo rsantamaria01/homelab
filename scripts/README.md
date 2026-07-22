@@ -85,6 +85,76 @@ curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/
 
 ---
 
+## monitoring/monitor.sh
+
+Onboards a Proxmox target into the telemetry stack (Loki + Prometheus LXCs —
+passed as variables, e.g. 109 / 110). Installs the right agents, then registers
+the target with Prometheus via file_sd and reloads it.
+
+**Modes** (`MODE=`) — each mode is its own Prometheus job + file_sd dir:
+
+| mode | target | installs | targets | job / dir |
+|------|--------|----------|---------|-----------|
+| `node` | this PVE host | node_exporter + Alloy | `:9100` | `node` |
+| `lxc` | an LXC (`GUEST_ID`) | node_exporter + Alloy | `:9100` | `lxc` |
+| `vm` | a VM (`GUEST_ID`) | node_exporter + Alloy via qemu-guest-agent | `:9100` | `vm` |
+| `docker` | a docker LXC host (`GUEST_ID`) | node_exporter + Alloy + cAdvisor | `:9100`, `:8181` | `docker` |
+| `pve` | this node | prometheus-pve-exporter (needs `PVE_API_TOKEN`) | `:9221 /pve` | `pve` |
+
+- **Cluster-aware** — run on *any* node. Reads `/etc/pve` to find where the
+  target / Loki / Prometheus live and acts on the right node, hopping over the
+  root SSH link Proxmox already provisions between members (not per-guest keys).
+- **file_sd discovery** — one job per mode reading `targets/<mode>/<name>.json`.
+  `monitor.sh` drops the file and reloads; `prometheus.yml` never changes per
+  target; removing = delete the file.
+- **Runtime hostname** names the file, the Prometheus `name` label and the Loki
+  `job` label — so metrics and logs correlate in Grafana.
+
+> Run on a Proxmox node as root. One-time: the per-mode file_sd jobs must exist
+> in `prometheus.yml` (see `scripts/monitoring/prometheus.yml`).
+> Rollout order: `pve` and all `node`s first, then `lxc`/`vm`/`docker` guests.
+
+Everything is passed via env — nothing goes after `./monitor.sh`.
+
+```bash
+# PVE hosts (run on each)
+LOKI_LXC_ID=109 PROM_LXC_ID=110 MODE=node ./monitoring/monitor.sh
+# PVE exporter (once, on one node)
+PROM_LXC_ID=110 MODE=pve PVE_API_TOKEN='root@pam!mon=UUID-SECRET' ./monitoring/monitor.sh
+# guests — from any node
+LOKI_LXC_ID=109 PROM_LXC_ID=110 MODE=lxc    GUEST_ID=105 ./monitoring/monitor.sh
+LOKI_LXC_ID=109 PROM_LXC_ID=110 MODE=vm     GUEST_ID=201 ./monitoring/monitor.sh
+LOKI_LXC_ID=109 PROM_LXC_ID=110 MODE=docker GUEST_ID=108 ./monitoring/monitor.sh
+# curl | bash form
+LOKI_LXC_ID=109 PROM_LXC_ID=110 MODE=lxc GUEST_ID=105 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/rsantamaria01/homelab/main/scripts/monitoring/monitor.sh)"
+```
+
+Required: `MODE`; `PROM_LXC_ID`; `LOKI_LXC_ID` (all modes but `pve`); `GUEST_ID`
+(lxc/vm/docker); `PVE_API_TOKEN` (`pve`, format `user@realm!tokenname=SECRET`).
+Variables are **gated per mode** — setting one that does not apply to the chosen
+mode (e.g. `GUEST_ID` with `MODE=node`, or `PVE_API_TOKEN` outside `pve`) aborts
+with an error, so a leftover exported var from a previous run fails loudly.
+Optional (defaults): `LOKI_URL` (auto), `LOKI_PORT` (3100), `NODE_PORT` (9100),
+`CADVISOR_PORT` (8181), `PVE_PORT` (9221), `PROM_TGT_DIR`
+(`/etc/prometheus/targets`), `PROM_SVC` (`prometheus`), `NODE_EXPORTER_VER`
+(1.8.2), `SKIP_LOGS` / `SKIP_METRICS`.
+
+Deregister (`<PROM_LXC_ID>` = your Prometheus ct):
+
+```bash
+pct exec <PROM_LXC_ID> -- rm /etc/prometheus/targets/<mode>/<name>.json \
+  && pct exec <PROM_LXC_ID> -- systemctl reload prometheus
+```
+
+> **vm** needs `qemu-guest-agent` running in the VM (PVE ≥ 7.2 for `--pass-stdin`);
+> guest-agent exec is not streamed live — output prints after it finishes.
+> **docker** assumes the docker host is an LXC (`pct exec`); Alloy is added to the
+> `docker` group to read container logs. **pve** writes the API token to
+> `/etc/prometheus/pve.yml` (mode 600) on the node you run it on.
+
+---
+
 ## Notes
 
 - All scripts require root or `sudo`

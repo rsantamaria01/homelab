@@ -1,0 +1,58 @@
+# /etc/prometheus/prometheus.yml   (Prometheus LXC 110)
+#
+# file_sd version: targets are read from /etc/prometheus/targets/<mode>/*.json,
+# each written by monitor.sh (one file per target, one dir+job per mode). Adding
+# a target never touches this file. monitor.sh SIGHUP-reloads prometheus after
+# writing, so the target is live immediately; refresh_interval is just a backstop.
+# No --web.enable-lifecycle needed (reload is via `systemctl reload`, not HTTP).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          app: "prometheus"
+
+  # One job per monitor.sh MODE. Each reads its own file_sd dir; monitor.sh drops
+  # one <name>.json per target there and reloads prometheus. This file never
+  # changes per target. node/lxc/vm/docker scrape /metrics; pve uses /pve.
+
+  - job_name: "node"
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/node/*.json"]
+        refresh_interval: 5m
+
+  - job_name: "lxc"
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/lxc/*.json"]
+        refresh_interval: 5m
+
+  - job_name: "vm"
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/vm/*.json"]
+        refresh_interval: 5m
+
+  - job_name: "docker"
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/docker/*.json"]
+        refresh_interval: 5m
+
+  - job_name: "pve"
+    metrics_path: /pve
+    params:
+      module: ['default']
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/pve/*.json"]
+        refresh_interval: 5m
