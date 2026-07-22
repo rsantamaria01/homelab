@@ -94,11 +94,20 @@ ct_locate() {
     [[ -f "$d/qemu-server/$id.conf" ]] && { echo "$n qemu"; return; }
   done
 }
-# Run a command on a node: local direct, else over PVE's inter-node SSH.
+# Cluster IP for a node name (node names aren't always DNS/hosts-resolvable).
+# Proxmox records each member's ring address in /etc/pve/.members; fall back to
+# the name itself if that lookup fails.
+node_addr() {
+  local n="$1" ip=""
+  [[ -r /etc/pve/.members ]] && \
+    ip="$(grep -A3 -F "\"$n\"" /etc/pve/.members | grep -oP '"ip"\s*:\s*"\K[0-9.]+' | head -1 || true)"
+  echo "${ip:-$n}"
+}
+# Run a command on a node: local direct, else over PVE's inter-node SSH (by IP).
 nrun() {
   local node="$1"; shift
   if [[ "$node" == "$SELF" ]]; then "$@"
-  else ssh "${SSH_OPTS[@]}" "root@${node}" "$@"; fi
+  else ssh "${SSH_OPTS[@]}" "root@$(node_addr "$node")" "$@"; fi
 }
 
 echo -e "\n${GN}== monitor (${MODE}) ==${CL}\n"
