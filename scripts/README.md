@@ -110,8 +110,10 @@ the target with Prometheus via file_sd and reloads it.
 - **Runtime hostname** names the file, the Prometheus `name` label and the Loki
   `job` label — so metrics and logs correlate in Grafana.
 
-> Run on a Proxmox node as root. One-time: the per-mode file_sd jobs must exist
-> in `prometheus.yml` (see `scripts/monitoring/prometheus.yml`).
+> Run on a Proxmox node as root. The script self-configures Prometheus: on first
+> use of a mode it appends that mode's file_sd job to the Prometheus LXC's
+> `prometheus.yml` (idempotent, backs up once to `.bak`) and reloads — no manual
+> edit. `scripts/monitoring/prometheus.yml` is the full reference config.
 > Rollout order: `pve` and all `node`s first, then `lxc`/`vm`/`docker` guests.
 
 Everything is passed via env — nothing goes after `./monitor.sh`.
@@ -137,7 +139,8 @@ mode (e.g. `GUEST_ID` with `MODE=node`, or `PVE_API_TOKEN` outside `pve`) aborts
 with an error, so a leftover exported var from a previous run fails loudly.
 Optional (defaults): `LOKI_URL` (auto), `LOKI_PORT` (3100), `NODE_PORT` (9100),
 `CADVISOR_PORT` (8181), `PVE_PORT` (9221), `PROM_TGT_DIR`
-(`/etc/prometheus/targets`), `PROM_SVC` (`prometheus`), `NODE_EXPORTER_VER`
+(`/etc/prometheus/targets`), `PROM_SVC` (`prometheus`), `PROM_YML`
+(`/etc/prometheus/prometheus.yml`), `CADVISOR_VER` (v0.49.1), `NODE_EXPORTER_VER`
 (1.8.2), `SKIP_LOGS` / `SKIP_METRICS`.
 
 Deregister (`<PROM_LXC_ID>` = your Prometheus ct):

@@ -30,7 +30,11 @@
 #   pve           : + PVE_API_TOKEN            (blocks LOKI_LXC_ID, GUEST_ID)
 # Optional : LOKI_URL()  LOKI_PORT(3100)  NODE_PORT(9100)  CADVISOR_PORT(8181)
 #            PVE_PORT(9221)  PROM_TGT_DIR(/etc/prometheus/targets)
-#            PROM_SVC(prometheus)  NODE_EXPORTER_VER(1.8.2)  SKIP_LOGS/SKIP_METRICS
+#            PROM_SVC(prometheus)  PROM_YML(/etc/prometheus/prometheus.yml)
+#            NODE_EXPORTER_VER(1.8.2)  CADVISOR_VER(v0.49.1)  SKIP_LOGS/SKIP_METRICS
+#
+# On first use of a mode the script appends that mode's file_sd job to the
+# Prometheus LXC's prometheus.yml (idempotent, backs up once to .bak) + reloads.
 
 set -Eeuo pipefail
 
@@ -40,6 +44,7 @@ LOKI_LXC_ID="${LOKI_LXC_ID:-}"; PROM_LXC_ID="${PROM_LXC_ID:-}"
 LOKI_PORT="${LOKI_PORT:-3100}"; NODE_PORT="${NODE_PORT:-9100}"
 CADVISOR_PORT="${CADVISOR_PORT:-8181}"; PVE_PORT="${PVE_PORT:-9221}"
 PROM_TGT_DIR="${PROM_TGT_DIR:-/etc/prometheus/targets}"; PROM_SVC="${PROM_SVC:-prometheus}"
+PROM_YML="${PROM_YML:-/etc/prometheus/prometheus.yml}"
 NODE_EXPORTER_VER="${NODE_EXPORTER_VER:-1.8.2}"; CADVISOR_VER="${CADVISOR_VER:-v0.49.1}"
 SELF="$(hostname)"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
@@ -353,6 +358,22 @@ TARGET_JSON="[
 
 msg_info "Registering ${TARGETS[*]} with Prometheus (node ${PROM_NODE})"
 nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- mkdir -p "$REG_DIR"
+
+# Ensure prometheus.yml has the file_sd job for this mode (idempotent). Appends
+# under scrape_configs if absent — scrape_configs is the last top-level block in
+# a stock config, so appending extends it. Backs up once via `cp -n`.
+if ! nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- grep -qF "targets/${MODE}/" "$PROM_YML"; then
+  if [[ "$MODE" == pve ]]; then
+    JOB_BLOCK=$(printf '\n  - job_name: "pve"\n    metrics_path: /pve\n    params:\n      module: [%s]\n    file_sd_configs:\n      - files: ["%s/pve/*.json"]\n        refresh_interval: 5m\n' "'default'" "$PROM_TGT_DIR")
+  else
+    JOB_BLOCK=$(printf '\n  - job_name: "%s"\n    file_sd_configs:\n      - files: ["%s/%s/*.json"]\n        refresh_interval: 5m\n' "$MODE" "$PROM_TGT_DIR" "$MODE")
+  fi
+  nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- cp -n "$PROM_YML" "${PROM_YML}.bak" 2>/dev/null || true
+  printf '%s\n' "$JOB_BLOCK" | nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- tee -a "$PROM_YML" >/dev/null
+  msg_ok "Added '${MODE}' file_sd job to prometheus.yml (backup: ${PROM_YML}.bak)"
+  msg_info "Registering ${TARGETS[*]} with Prometheus (node ${PROM_NODE})"
+fi
+
 printf '%s\n' "$TARGET_JSON" | nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- cp /dev/stdin "$REG_FILE"
 nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- systemctl reload "$PROM_SVC" 2>/dev/null \
   || nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- systemctl restart "$PROM_SVC"
