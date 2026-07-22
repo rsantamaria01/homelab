@@ -247,8 +247,14 @@ if [ "${SKIP_LOGS:-0}" != 1 ]; then
     JOURNAL_BLOCK="$(cat <<JB
 loki.relabel "journal" {
   forward_to = []
-  rule { source_labels = ["__journal__systemd_unit"], target_label = "unit" }
-  rule { source_labels = ["__journal_priority_keyword"], target_label = "level" }
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
 }
 loki.source.journal "read" {
   max_age = "12h"
