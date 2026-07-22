@@ -164,7 +164,9 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
-  systemctl daemon-reload; systemctl enable --now node_exporter
+  # restart (not just enable --now) so a re-run picks up a new binary/unit
+  systemctl daemon-reload; systemctl enable node_exporter >/dev/null 2>&1 || true
+  systemctl restart node_exporter
 fi
 # cAdvisor (docker mode only)
 if [[ "${DEPLOY_CADVISOR:-0}" == 1 ]]; then
@@ -344,7 +346,10 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
-  systemctl daemon-reload; systemctl enable --now prometheus-pve-exporter
+  # restart (not just enable --now) so a pre-existing/stale exporter picks up
+  # the new /opt binary, unit, and pve.yml credentials
+  systemctl daemon-reload; systemctl enable prometheus-pve-exporter >/dev/null 2>&1 || true
+  systemctl restart prometheus-pve-exporter
   msg_ok "pve-exporter up on :${PVE_PORT}"
   TARGETS=("${TARGET_IP}:${PVE_PORT}")
   ;;
