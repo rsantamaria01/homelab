@@ -267,7 +267,7 @@ lxc|docker)
   [[ "$MODE" == docker ]] && { DEPLOY_CADVISOR=1; DOCKER_LOGS=1; }
   line "Installing agents on ${TARGET_NAME} @ ${HOST_NODE} (live):"
   TMP="/tmp/.monitor-install.$$.sh"
-  printf '%s' "$INSTALLER" | nrun "$HOST_NODE" pct exec "$GUEST_ID" -- cp /dev/stdin "$TMP"
+  printf '%s' "$INSTALLER" | nrun "$HOST_NODE" pct exec "$GUEST_ID" -- tee "$TMP" >/dev/null
   # run install, then ALWAYS clean up the temp file even on failure (the ERR
   # trap would otherwise exit before the rm), and surface the real exit code.
   set +e
@@ -383,7 +383,7 @@ if ! nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- grep -qF "targets/${MODE}/" "$
   msg_info "Registering ${TARGETS[*]} with Prometheus (node ${PROM_NODE})"
 fi
 
-printf '%s\n' "$TARGET_JSON" | nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- cp /dev/stdin "$REG_FILE"
+printf '%s\n' "$TARGET_JSON" | nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- tee "$REG_FILE" >/dev/null
 nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- systemctl reload "$PROM_SVC" 2>/dev/null \
   || nrun "$PROM_NODE" pct exec "$PROM_LXC_ID" -- systemctl restart "$PROM_SVC"
 msg_ok "Registered ${REG_FILE} + reloaded"
