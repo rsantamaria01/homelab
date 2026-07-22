@@ -141,7 +141,11 @@ Optional (defaults): `LOKI_URL` (auto), `LOKI_PORT` (3100), `NODE_PORT` (9100),
 `CADVISOR_PORT` (8181), `PVE_PORT` (9221), `PROM_TGT_DIR`
 (`/etc/prometheus/targets`), `PROM_SVC` (`prometheus`), `PROM_YML`
 (`/etc/prometheus/prometheus.yml`), `CADVISOR_VER` (v0.49.1), `NODE_EXPORTER_VER`
-(1.8.2), `SKIP_LOGS` / `SKIP_METRICS`.
+(1.8.2), `ALLOY_VER` (latest, Alpine only), `SKIP_LOGS` / `SKIP_METRICS`.
+
+Guests may be **Debian/Ubuntu (systemd)** or **Alpine (OpenRC)** — the installer
+detects `apt`/`apk` and `systemd`/`openrc` and adapts (binary Alloy on Alpine,
+file-only log scraping since Alpine has no systemd journal).
 
 Deregister (`<PROM_LXC_ID>` = your Prometheus ct):
 

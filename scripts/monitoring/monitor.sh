@@ -46,6 +46,7 @@ CADVISOR_PORT="${CADVISOR_PORT:-8181}"; PVE_PORT="${PVE_PORT:-9221}"
 PROM_TGT_DIR="${PROM_TGT_DIR:-/etc/prometheus/targets}"; PROM_SVC="${PROM_SVC:-prometheus}"
 PROM_YML="${PROM_YML:-/etc/prometheus/prometheus.yml}"
 NODE_EXPORTER_VER="${NODE_EXPORTER_VER:-1.8.2}"; CADVISOR_VER="${CADVISOR_VER:-v0.49.1}"
+ALLOY_VER="${ALLOY_VER:-latest}"   # only used for the Alpine binary install
 SELF="$(hostname)"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
 
@@ -128,29 +129,53 @@ INSTALLER="$(cat <<'GUEST_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 LOKI_URL="${LOKI_URL:?}"; JOB_LABEL="${JOB_LABEL:-$(hostname)}"
-NODE_EXPORTER_VER="${NODE_EXPORTER_VER:-1.8.2}"
+NODE_EXPORTER_VER="${NODE_EXPORTER_VER:-1.8.2}"; ALLOY_VER="${ALLOY_VER:-latest}"
 HOST_FQDN="$(hostname -f 2>/dev/null || hostname)"
 case "$(uname -m)" in
   x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; armv7l) ARCH=armv7 ;;
   *) echo "unsupported arch $(uname -m)" >&2; exit 1 ;;
 esac
 need() { command -v "$1" >/dev/null 2>&1; }
-# bounded, retrying fetch — a slow/blackholed mirror must not hang onboarding
 CURL=(curl -fsSL --connect-timeout 10 --max-time 300 --retry 3 --retry-delay 2)
-APT_RETRY=(-o Acquire::Retries=3)
-if ! need curl || ! need wget || ! need gpg; then
-  apt-get "${APT_RETRY[@]}" update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get "${APT_RETRY[@]}" install -y -qq curl wget ca-certificates gnupg >/dev/null
-fi
-# node_exporter (metrics)
-if [[ "${SKIP_METRICS:-0}" != 1 ]]; then
-  echo "  - node_exporter v${NODE_EXPORTER_VER}"
+
+# --- detect package manager + init system (Debian/systemd or Alpine/OpenRC) --
+if need apt-get; then PKG=apt
+elif need apk; then PKG=apk
+else echo "unsupported distro: need apt-get or apk" >&2; exit 1; fi
+if need systemctl && [ -d /run/systemd/system ]; then INIT=systemd
+elif need rc-update; then INIT=openrc
+else echo "unsupported init: need systemd or openrc" >&2; exit 1; fi
+
+pkg_add() {
+  case "$PKG" in
+    apt) apt-get -o Acquire::Retries=3 update -qq
+         DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y -qq "$@" >/dev/null ;;
+    apk) apk add --no-cache "$@" >/dev/null ;;
+  esac
+}
+svc_up() {  # enable + (re)start a service by init system
+  if [ "$INIT" = systemd ]; then
+    systemctl daemon-reload; systemctl enable "$1" >/dev/null 2>&1 || true; systemctl restart "$1"
+  else
+    rc-update add "$1" default >/dev/null 2>&1 || true; rc-service "$1" restart
+  fi
+}
+
+# base tools
+need curl || pkg_add curl
+need wget || pkg_add wget
+[ "$PKG" = apt ] && { need gpg || pkg_add ca-certificates gnupg; }
+
+# node_exporter (metrics) — static binary works on glibc + musl
+if [ "${SKIP_METRICS:-0}" != 1 ]; then
+  echo "  - node_exporter v${NODE_EXPORTER_VER} (${PKG}/${INIT})"
   tgz="node_exporter-${NODE_EXPORTER_VER}.linux-${ARCH}"; tmp="$(mktemp -d)"
   "${CURL[@]}" "https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VER}/${tgz}.tar.gz" -o "$tmp/ne.tgz"
   tar -xzf "$tmp/ne.tgz" -C "$tmp"
   install -m0755 "$tmp/${tgz}/node_exporter" /usr/local/bin/node_exporter; rm -rf "$tmp"
-  id node_exporter &>/dev/null || useradd -rs /bin/false node_exporter
-  cat > /etc/systemd/system/node_exporter.service <<UNIT
+  if [ "$INIT" = systemd ]; then
+    id node_exporter >/dev/null 2>&1 || useradd -rs /bin/false node_exporter
+    cat > /etc/systemd/system/node_exporter.service <<UNIT
 [Unit]
 Description=Prometheus node_exporter
 After=network-online.target
@@ -164,12 +189,24 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
-  # restart (not just enable --now) so a re-run picks up a new binary/unit
-  systemctl daemon-reload; systemctl enable node_exporter >/dev/null 2>&1 || true
-  systemctl restart node_exporter
+  else
+    cat > /etc/init.d/node_exporter <<'RC'
+#!/sbin/openrc-run
+name="node_exporter"
+command="/usr/local/bin/node_exporter"
+command_args="--collector.processes"
+command_background=true
+pidfile="/run/node_exporter.pid"
+output_log="/var/log/node_exporter.log"
+error_log="/var/log/node_exporter.log"
+RC
+    chmod +x /etc/init.d/node_exporter
+  fi
+  svc_up node_exporter
 fi
+
 # cAdvisor (docker mode only)
-if [[ "${DEPLOY_CADVISOR:-0}" == 1 ]]; then
+if [ "${DEPLOY_CADVISOR:-0}" = 1 ]; then
   need docker || { echo "docker not found on this host" >&2; exit 1; }
   echo "  - cAdvisor container :${CADVISOR_PORT:-8181}"
   docker rm -f cadvisor >/dev/null 2>&1 || true
@@ -179,20 +216,49 @@ if [[ "${DEPLOY_CADVISOR:-0}" == 1 ]]; then
     --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/dev/disk/:/dev/disk:ro \
     --privileged --device=/dev/kmsg "gcr.io/cadvisor/cadvisor:${CADVISOR_VER:-v0.49.1}" >/dev/null
 fi
-# Alloy (logs)
-if [[ "${SKIP_LOGS:-0}" != 1 ]]; then
+
+# Alloy (logs) — apt package on Debian, release binary on Alpine
+if [ "${SKIP_LOGS:-0}" != 1 ]; then
   echo "  - Grafana Alloy -> ${LOKI_URL}"
-  if ! need alloy; then
-    install -d -m0755 /etc/apt/keyrings
-    wget -q --timeout=15 --tries=3 -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /etc/apt/keyrings/grafana.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
-    apt-get "${APT_RETRY[@]}" update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get "${APT_RETRY[@]}" install -y -qq alloy >/dev/null
+  if [ "$PKG" = apt ]; then
+    if ! need alloy; then
+      install -d -m0755 /etc/apt/keyrings
+      wget -q --timeout=15 --tries=3 -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /etc/apt/keyrings/grafana.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+      pkg_add alloy
+    fi
+  else
+    need unzip || pkg_add unzip
+    if [ ! -x /usr/local/bin/alloy ]; then
+      if [ "$ALLOY_VER" = latest ]; then AURL="https://github.com/grafana/alloy/releases/latest/download/alloy-linux-${ARCH}.zip"
+      else AURL="https://github.com/grafana/alloy/releases/download/${ALLOY_VER}/alloy-linux-${ARCH}.zip"; fi
+      tmp="$(mktemp -d)"; "${CURL[@]}" "$AURL" -o "$tmp/alloy.zip"
+      (cd "$tmp" && unzip -qo alloy.zip)
+      install -m0755 "$tmp/alloy-linux-${ARCH}" /usr/local/bin/alloy; rm -rf "$tmp"
+    fi
+    install -d /etc/alloy /var/lib/alloy
   fi
-  usermod -aG systemd-journal,adm alloy 2>/dev/null || true
+
+  # journal source only where a systemd journal exists
+  JOURNAL_BLOCK=""
+  if [ "$INIT" = systemd ]; then
+    JOURNAL_BLOCK="$(cat <<JB
+loki.relabel "journal" {
+  forward_to = []
+  rule { source_labels = ["__journal__systemd_unit"], target_label = "unit" }
+  rule { source_labels = ["__journal_priority_keyword"], target_label = "level" }
+}
+loki.source.journal "read" {
+  max_age = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  forward_to = [loki.write.default.receiver]
+  labels = { job = "${JOB_LABEL}", host = "${HOST_FQDN}" }
+}
+JB
+)"
+  fi
   DOCKER_BLOCK=""
-  if [[ "${DOCKER_LOGS:-0}" == 1 ]]; then
-    usermod -aG docker alloy 2>/dev/null || true
+  if [ "${DOCKER_LOGS:-0}" = 1 ]; then
     DOCKER_BLOCK="$(cat <<DB
 discovery.docker "dockerd" { host = "unix:///var/run/docker.sock" }
 loki.source.docker "containers" {
@@ -207,17 +273,7 @@ DB
   cat > /etc/alloy/config.alloy <<ALLOY
 // Managed by monitor.sh — logs -> Loki
 loki.write "default" { endpoint { url = "${LOKI_URL}/loki/api/v1/push" } }
-loki.relabel "journal" {
-  forward_to = []
-  rule { source_labels = ["__journal__systemd_unit"], target_label = "unit" }
-  rule { source_labels = ["__journal_priority_keyword"], target_label = "level" }
-}
-loki.source.journal "read" {
-  max_age = "12h"
-  relabel_rules = loki.relabel.journal.rules
-  forward_to = [loki.write.default.receiver]
-  labels = { job = "${JOB_LABEL}", host = "${HOST_FQDN}" }
-}
+${JOURNAL_BLOCK}
 local.file_match "varlogs" {
   path_targets = [{ __path__ = "/var/log/*.log", job = "${JOB_LABEL}", host = "${HOST_FQDN}" }]
 }
@@ -227,7 +283,25 @@ loki.source.file "varlogs" {
 }
 ${DOCKER_BLOCK}
 ALLOY
-  systemctl daemon-reload; systemctl enable --now alloy; systemctl restart alloy
+
+  if [ "$PKG" = apt ]; then
+    usermod -aG systemd-journal,adm alloy 2>/dev/null || true
+    [ "${DOCKER_LOGS:-0}" = 1 ] && usermod -aG docker alloy 2>/dev/null || true
+    systemctl daemon-reload; systemctl enable alloy >/dev/null 2>&1 || true; systemctl restart alloy
+  else
+    cat > /etc/init.d/alloy <<'RC'
+#!/sbin/openrc-run
+name="alloy"
+command="/usr/local/bin/alloy"
+command_args="run /etc/alloy/config.alloy --storage.path=/var/lib/alloy"
+command_background=true
+pidfile="/run/alloy.pid"
+output_log="/var/log/alloy.log"
+error_log="/var/log/alloy.log"
+RC
+    chmod +x /etc/init.d/alloy
+    svc_up alloy
+  fi
 fi
 GUEST_EOF
 )"
@@ -237,7 +311,7 @@ agent_env() {
   echo "LOKI_URL=$LOKI_URL" "JOB_LABEL=$TARGET_NAME" "NODE_EXPORTER_VER=$NODE_EXPORTER_VER" \
        "SKIP_LOGS=${SKIP_LOGS:-0}" "SKIP_METRICS=${SKIP_METRICS:-0}" \
        "DEPLOY_CADVISOR=${DEPLOY_CADVISOR:-0}" "DOCKER_LOGS=${DOCKER_LOGS:-0}" \
-       "CADVISOR_PORT=$CADVISOR_PORT" "CADVISOR_VER=$CADVISOR_VER"
+       "CADVISOR_PORT=$CADVISOR_PORT" "CADVISOR_VER=$CADVISOR_VER" "ALLOY_VER=$ALLOY_VER"
 }
 
 # ===========================================================================
