@@ -137,6 +137,8 @@ case "$(uname -m)" in
 esac
 need() { command -v "$1" >/dev/null 2>&1; }
 CURL=(curl -fsSL --connect-timeout 10 --max-time 300 --retry 3 --retry-delay 2)
+# always clean the working temp dir, even on failure (small guests fill up fast)
+tmp=""; trap 'rm -rf "${tmp:-/nonexistent}" 2>/dev/null || true' EXIT
 
 # --- detect package manager + init system (Debian/systemd or Alpine/OpenRC) --
 if need apt-get; then PKG=apt
